@@ -1,0 +1,366 @@
+ubuntu@ip-172-31-4-223:~/project1$ ll
+total 160
+drwxrwxr-x 4 ubuntu ubuntu  4096 Jan 21 10:39 ./
+drwxr-x--- 6 ubuntu ubuntu  4096 Jan 21 10:37 ../
+drwxr-xr-x 3 ubuntu ubuntu  4096 Jan 20 15:43 .terraform/
+-rw-r--r-- 1 ubuntu ubuntu  2421 Jan 20 15:43 .terraform.lock.hcl
+-rw-rw-r-- 1 ubuntu ubuntu  2173 Jan 21 10:37 alb.tf
+-rw-rw-r-- 1 ubuntu ubuntu   407 Jan 21 07:32 index.php
+-rw-rw-r-- 1 ubuntu ubuntu   177 Jan 20 15:39 provider.tf
+-rw-rw-r-- 1 ubuntu ubuntu  2385 Jan 21 09:26 rds.tf
+-rw-rw-r-- 1 ubuntu ubuntu   790 Jan 21 07:29 sourcefile.php
+drwxrwxr-x 2 ubuntu ubuntu  4096 Jan 21 07:42 temp/
+-rw-rw-r-- 1 ubuntu ubuntu 57689 Jan 21 10:39 terraform.tfstate
+-rw-rw-r-- 1 ubuntu ubuntu 52107 Jan 21 10:38 terraform.tfstate.backup
+-rw-rw-r-- 1 ubuntu ubuntu  5402 Jan 21 10:37 vpcec2.tf
+ubuntu@ip-172-31-4-223:~/project1$ cat vpcec2.tf
+resource "aws_vpc" "my_vpc" {
+  cidr_block = "10.0.0.0/16"
+  enable_dns_support = true
+  enable_dns_hostnames = true
+  tags = {
+    Name = "my-vpc"
+  }
+}
+
+# Create Internet Gateway
+resource "aws_internet_gateway" "my_igw" {
+  vpc_id = aws_vpc.my_vpc.id
+  tags = {
+    Name = "my-igw"
+  }
+}
+
+# Create Public Subnets and associate with Public Route Table
+resource "aws_subnet" "public_subnet_1" {
+  vpc_id                  = aws_vpc.my_vpc.id
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "ap-south-1a" # Change this to your desired availability zone
+  map_public_ip_on_launch = true
+  tags = {
+    Name = "public-subnet-1"
+  }
+}
+
+resource "aws_subnet" "public_subnet_2" {
+  vpc_id                  = aws_vpc.my_vpc.id
+  cidr_block              = "10.0.2.0/24"
+  availability_zone       = "ap-south-1b" # Change this to your desired availability zone
+  map_public_ip_on_launch = true
+  tags = {
+    Name = "public-subnet-2"
+  }
+}
+
+# Create Public Route Table and add route to Internet Gateway
+resource "aws_route_table" "public_route_table" {
+  vpc_id = aws_vpc.my_vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.my_igw.id
+  }
+  tags = {
+    Name = "public-route-table"
+  }
+}
+
+# Associate Public Subnets with Public Route Table
+resource "aws_route_table_association" "public_subnet_association_1" {
+  subnet_id          = aws_subnet.public_subnet_1.id
+  route_table_id     = aws_route_table.public_route_table.id
+}
+
+resource "aws_route_table_association" "public_subnet_association_2" {
+  subnet_id          = aws_subnet.public_subnet_2.id
+  route_table_id     = aws_route_table.public_route_table.id
+}
+
+# Create Private Subnets and associate with Private Route Table
+resource "aws_subnet" "private_subnet_1" {
+  vpc_id                  = aws_vpc.my_vpc.id
+  cidr_block              = "10.0.3.0/24"
+  availability_zone       = "ap-south-1a" # Change this to your desired availability zone
+  map_public_ip_on_launch = false
+  tags = {
+    Name = "private-subnet-1"
+  }
+}
+
+resource "aws_subnet" "private_subnet_2" {
+  vpc_id                  = aws_vpc.my_vpc.id
+  cidr_block              = "10.0.4.0/24"
+  availability_zone       = "ap-south-1b" # Change this to your desired availability zone
+  map_public_ip_on_launch = false
+  tags = {
+    Name = "private-subnet-2"
+  }
+}
+
+# Create Private Route Table (without internet gateway route)
+resource "aws_route_table" "private_route_table" {
+  vpc_id = aws_vpc.my_vpc.id
+  tags = {
+    Name = "private-route-table"
+  }
+}
+
+# Associate Private Subnets with Private Route Table
+resource "aws_route_table_association" "private_subnet_association_1" {
+  subnet_id          = aws_subnet.private_subnet_1.id
+  route_table_id     = aws_route_table.private_route_table.id
+}
+
+resource "aws_route_table_association" "private_subnet_association_2" {
+  subnet_id          = aws_subnet.private_subnet_2.id
+  route_table_id     = aws_route_table.private_route_table.id
+}
+###############################################################################################################
+
+# Generate SSH Key Pair
+resource "tls_private_key" "my_key_pair" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+# Output the private key
+output "private_key" {
+  value = tls_private_key.my_key_pair.private_key_pem
+  sensitive = true
+}
+
+# Output the public key
+output "public_key" {
+  value = tls_private_key.my_key_pair.public_key_openssh
+  sensitive = true
+}
+
+# Output the key name
+output "key_name" {
+  value     = "vikram-key"  # Replace with your desired key name
+  sensitive = true
+}
+############################################################################################################
+# Create Security Group for Public Subnets (HTTP Inbound, All Outbound)
+resource "aws_security_group" "public_sg" {
+  name        = "public-sg"
+  description = "Security group for public subnets"
+
+  vpc_id = aws_vpc.my_vpc.id
+
+  # Inbound rule for HTTP (port 80)
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Outbound rule allowing all traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "public-security-group"
+  }
+}
+
+##################################################################################
+
+# Create Ubuntu EC2 Instances in Public Subnets
+resource "aws_instance" "web_servers" {
+  count = 2
+
+  ami             = "ami-03f4878755434977f"
+  instance_type   = "t2.micro" # Change to your desired instance type
+# key_name        = tls_private_key.my_key_pair.key_name
+  key_name        = "LAMP-Project"
+  subnet_id       = element([aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id], count.index)
+  security_groups = [aws_security_group.public_sg.id]
+  user_data       = <<-EOF
+                    #!/bin/bash
+                    apt-get update -y
+                    DEBIAN_FRONTEND=noninteractive apt-get install -y apache2 mysql-client php git php-mysql
+                    sudo cd /var/www/html
+                    sudo rm -rf /var/www/html/index.html
+                    sudo wget https://raw.githubusercontent.com/VikramGowdru/DevOps-Projects/main/index.php -P /var/www/html
+                    systemctl enable apache2
+                    systemctl start apache2
+                    EOF
+
+  tags = {
+    Name = "web-server-${count.index + 1}"
+  }
+}
+ubuntu@ip-172-31-4-223:~/project1$ cat rds.tf
+resource "aws_security_group" "mysql_sg" {
+  name        = "mysql-sg"
+  description = "Security group for MySQL server"
+
+  vpc_id = aws_vpc.my_vpc.id
+
+  # Inbound rule for MySQL (port 3306) - allow connections from the application servers
+  ingress {
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    security_groups = [aws_security_group.public_sg.id]
+  }
+
+  # Outbound rule allowing all traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "mysql-security-group"
+  }
+}
+
+# Create DB Parameter Group for MySQL
+resource "aws_db_parameter_group" "mysql_parameter_group" {
+  name        = "mysql-parameter-group"
+  family      = "mysql8.0"
+  description = "Parameter group for MySQL server"
+
+  parameter {
+    name  = "character_set_server"
+    value = "utf8mb4"
+  }
+
+  parameter {
+    name  = "collation_server"
+    value = "utf8mb4_unicode_ci"
+  }
+}
+
+# Create MySQL RDS Instance in Private Subnet
+resource "aws_db_instance" "mysql_instance" {
+  identifier             = "my-mysql-instance"
+  allocated_storage     = 20
+  engine                 = "mysql"
+  engine_version         = "8.0"
+  instance_class         = "db.t2.micro"
+  db_name                = "mydatabase"
+  username               = "admin"
+  password               = "vikram123" # Replace with a strong password
+  parameter_group_name   = aws_db_parameter_group.mysql_parameter_group.name
+  vpc_security_group_ids = [aws_security_group.mysql_sg.id]
+# db_subnet_group_name   = aws_db_subnet_group.mysql_subnet_group.name
+  multi_az               = false
+  skip_final_snapshot    = false  # FYI,updated from true to false
+
+  # Specify the private subnet group for the RDS instance
+  db_subnet_group_name = aws_db_subnet_group.mysql_subnet_group.name
+}
+
+# Create DB Subnet Group for MySQL
+resource "aws_db_subnet_group" "mysql_subnet_group" {
+  name       = "mysql-subnet-group"
+  subnet_ids = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
+}
+
+# Output MySQL Connection Information
+output "mysql_connection_info" {
+  value = {
+    endpoint       = aws_db_instance.mysql_instance.endpoint
+    db_name        = aws_db_instance.mysql_instance.db_name
+    username       = aws_db_instance.mysql_instance.username
+    password       = aws_db_instance.mysql_instance.password
+  }
+  sensitive = true 
+}
+ubuntu@ip-172-31-4-223:~/project1$ cat alb.tf
+# Create Application Load Balancer
+resource "aws_lb" "my_alb" {
+  name               = "my-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb_sg.id]
+# subnets            = ["aws_subnet.public_subnet_1.id", "aws_subnet.public_subnet_2.id"]
+  subnets            = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
+# subnets            = [for subnet in aws_subnet.public : subnet.id]
+  enable_deletion_protection = false # Set to true if you want to enable deletion protection
+
+  enable_http2 = true # Enable HTTP/2 for the ALB
+
+  enable_cross_zone_load_balancing = true
+
+  tags = {
+    Name = "my-alb"
+  }
+}
+
+# Create ALB Security Group
+resource "aws_security_group" "alb_sg" {
+  name        = "alb-sg"
+  description = "Security group for Application Load Balancer"
+
+  vpc_id = aws_vpc.my_vpc.id
+
+  # Inbound rule for HTTP (port 80)
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Outbound rule allowing all traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "alb-security-group"
+  }
+}
+
+# Create Target Group for ALB
+resource "aws_lb_target_group" "my_target_group" {
+  name        = "my-target-group"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.my_vpc.id
+  target_type = "instance"
+
+  health_check {
+    path = "/" # Change this to your actual health check path
+    port = 80
+  }
+
+  tags = {
+    Name = "my-target-group"
+  }
+}
+
+# Attach EC2 instances to the Target Group
+resource "aws_lb_target_group_attachment" "my_target_group_attachment" {
+  count            = 2
+  target_group_arn = aws_lb_target_group.my_target_group.arn
+  target_id        = aws_instance.web_servers[count.index].id
+  port             = 80
+}
+
+# Create ALB Listener
+resource "aws_lb_listener" "my_listener" {
+  load_balancer_arn = aws_lb.my_alb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.my_target_group.arn
+  }
+}
+
+ubuntu@ip-172-31-4-223:~/project1$ 
