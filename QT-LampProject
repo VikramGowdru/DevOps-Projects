@@ -1,3 +1,6 @@
+###################################################################################################
+####All the files created and used in Project1 directory####
+
 ubuntu@ip-172-31-4-223:~/project1$ ll
 total 160
 drwxrwxr-x 4 ubuntu ubuntu  4096 Jan 21 10:39 ./
@@ -15,6 +18,8 @@ drwxrwxr-x 2 ubuntu ubuntu  4096 Jan 21 07:42 temp/
 -rw-rw-r-- 1 ubuntu ubuntu  5402 Jan 21 10:37 vpcec2.tf
 
 ########################################################################################################
+####VPC,EC2 & Related Scripts are present in vpcec2.tf script####
+
 ubuntu@ip-172-31-4-223:~/project1$ cat vpcec2.tf
 
 resource "aws_vpc" "my_vpc" {
@@ -55,7 +60,7 @@ resource "aws_subnet" "public_subnet_2" {
   }
 }
 
-#### Create Public Route Table and add route to Internet Gateway
+#### Create Public Route Table and add route to Internet Gateway####
 resource "aws_route_table" "public_route_table" {
   vpc_id = aws_vpc.my_vpc.id
   route {
@@ -170,9 +175,8 @@ resource "aws_security_group" "public_sg" {
   }
 }
 
-##################################################################################
 
-# Create Ubuntu EC2 Instances in Public Subnets
+#######Creation of Ubuntu EC2 Instances########
 resource "aws_instance" "web_servers" {
   count = 2
 
@@ -198,7 +202,12 @@ resource "aws_instance" "web_servers" {
   }
 }
 
-################################################################################################################################################
+
+
+
+###########################################################################################################################################################
+####All the Scripts Related to RDS is Present here#####
+
 ubuntu@ip-172-31-4-223:~/project1$ cat rds.tf
 
 resource "aws_security_group" "mysql_sg" {
@@ -282,7 +291,12 @@ output "mysql_connection_info" {
   sensitive = true 
 }
 
-#########################################################################################################
+
+
+
+##########################################################################################################################################################
+####All the Scripts Related to Load Balancer(ALB) is Present here#####
+
 ubuntu@ip-172-31-4-223:~/project1$ cat alb.tf
 
 # Create Application Load Balancer
