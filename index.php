@@ -4,7 +4,7 @@
   <title>MySQL Connection Test</title>
 </head>
 <body>
-
+echo "<h1>Hello how r u</h1>";
 <?php
 $conn = new mysqli('my-mysql-instance.c7oaea88gfev.ap-south-1.rds.amazonaws.com', 'admin', 'vikram123', 'mydatabase');
 echo "<h1>Hello All</h1>";
