@@ -13,7 +13,10 @@ drwxrwxr-x 2 ubuntu ubuntu  4096 Jan 21 07:42 temp/
 -rw-rw-r-- 1 ubuntu ubuntu 57689 Jan 21 10:39 terraform.tfstate
 -rw-rw-r-- 1 ubuntu ubuntu 52107 Jan 21 10:38 terraform.tfstate.backup
 -rw-rw-r-- 1 ubuntu ubuntu  5402 Jan 21 10:37 vpcec2.tf
+
+########################################################################################################
 ubuntu@ip-172-31-4-223:~/project1$ cat vpcec2.tf
+
 resource "aws_vpc" "my_vpc" {
   cidr_block = "10.0.0.0/16"
   enable_dns_support = true
@@ -23,7 +26,7 @@ resource "aws_vpc" "my_vpc" {
   }
 }
 
-# Create Internet Gateway
+## Create Internet Gateway
 resource "aws_internet_gateway" "my_igw" {
   vpc_id = aws_vpc.my_vpc.id
   tags = {
@@ -31,7 +34,7 @@ resource "aws_internet_gateway" "my_igw" {
   }
 }
 
-# Create Public Subnets and associate with Public Route Table
+## Create Public Subnets and associate with Public Route Table
 resource "aws_subnet" "public_subnet_1" {
   vpc_id                  = aws_vpc.my_vpc.id
   cidr_block              = "10.0.1.0/24"
@@ -52,7 +55,7 @@ resource "aws_subnet" "public_subnet_2" {
   }
 }
 
-# Create Public Route Table and add route to Internet Gateway
+#### Create Public Route Table and add route to Internet Gateway
 resource "aws_route_table" "public_route_table" {
   vpc_id = aws_vpc.my_vpc.id
   route {
@@ -64,7 +67,7 @@ resource "aws_route_table" "public_route_table" {
   }
 }
 
-# Associate Public Subnets with Public Route Table
+#### Associate Public Subnets with Public Route Table
 resource "aws_route_table_association" "public_subnet_association_1" {
   subnet_id          = aws_subnet.public_subnet_1.id
   route_table_id     = aws_route_table.public_route_table.id
@@ -75,7 +78,7 @@ resource "aws_route_table_association" "public_subnet_association_2" {
   route_table_id     = aws_route_table.public_route_table.id
 }
 
-# Create Private Subnets and associate with Private Route Table
+#### Create Private Subnets and associate with Private Route Table
 resource "aws_subnet" "private_subnet_1" {
   vpc_id                  = aws_vpc.my_vpc.id
   cidr_block              = "10.0.3.0/24"
@@ -96,7 +99,7 @@ resource "aws_subnet" "private_subnet_2" {
   }
 }
 
-# Create Private Route Table (without internet gateway route)
+#### Create Private Route Table (without internet gateway route)
 resource "aws_route_table" "private_route_table" {
   vpc_id = aws_vpc.my_vpc.id
   tags = {
@@ -104,7 +107,7 @@ resource "aws_route_table" "private_route_table" {
   }
 }
 
-# Associate Private Subnets with Private Route Table
+#### Associate Private Subnets with Private Route Table
 resource "aws_route_table_association" "private_subnet_association_1" {
   subnet_id          = aws_subnet.private_subnet_1.id
   route_table_id     = aws_route_table.private_route_table.id
@@ -114,33 +117,32 @@ resource "aws_route_table_association" "private_subnet_association_2" {
   subnet_id          = aws_subnet.private_subnet_2.id
   route_table_id     = aws_route_table.private_route_table.id
 }
-###############################################################################################################
 
-# Generate SSH Key Pair
+#### Generate SSH Key Pair
 resource "tls_private_key" "my_key_pair" {
   algorithm = "RSA"
   rsa_bits  = 2048
 }
 
-# Output the private key
+#### Output the private key
 output "private_key" {
   value = tls_private_key.my_key_pair.private_key_pem
   sensitive = true
 }
 
-# Output the public key
+#### Output the public key
 output "public_key" {
   value = tls_private_key.my_key_pair.public_key_openssh
   sensitive = true
 }
 
-# Output the key name
+#### Output the key name
 output "key_name" {
   value     = "vikram-key"  # Replace with your desired key name
   sensitive = true
 }
-############################################################################################################
-# Create Security Group for Public Subnets (HTTP Inbound, All Outbound)
+
+##### Create Security Group for Public Subnets (HTTP Inbound, All Outbound)
 resource "aws_security_group" "public_sg" {
   name        = "public-sg"
   description = "Security group for public subnets"
@@ -195,7 +197,10 @@ resource "aws_instance" "web_servers" {
     Name = "web-server-${count.index + 1}"
   }
 }
+
+################################################################################################################################################
 ubuntu@ip-172-31-4-223:~/project1$ cat rds.tf
+
 resource "aws_security_group" "mysql_sg" {
   name        = "mysql-sg"
   description = "Security group for MySQL server"
@@ -276,7 +281,10 @@ output "mysql_connection_info" {
   }
   sensitive = true 
 }
+
+#########################################################################################################
 ubuntu@ip-172-31-4-223:~/project1$ cat alb.tf
+
 # Create Application Load Balancer
 resource "aws_lb" "my_alb" {
   name               = "my-alb"
@@ -285,7 +293,6 @@ resource "aws_lb" "my_alb" {
   security_groups    = [aws_security_group.alb_sg.id]
 # subnets            = ["aws_subnet.public_subnet_1.id", "aws_subnet.public_subnet_2.id"]
   subnets            = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
-# subnets            = [for subnet in aws_subnet.public : subnet.id]
   enable_deletion_protection = false # Set to true if you want to enable deletion protection
 
   enable_http2 = true # Enable HTTP/2 for the ALB
@@ -363,4 +370,3 @@ resource "aws_lb_listener" "my_listener" {
   }
 }
 
-ubuntu@ip-172-31-4-223:~/project1$ 
